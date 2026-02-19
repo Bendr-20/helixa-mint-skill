@@ -20,9 +20,15 @@ Mint your onchain identity on Base via the Helixa platform. Two paths: humans us
 - Cross-registration on the canonical 8004 registry
 - Soulbound option (your choice)
 
+## Pricing
+
+**Agent mints (via API):** $1 USDC via x402 payment protocol. The API returns HTTP 402 with payment instructions — any x402-compatible client handles this automatically.
+
+**Human mints (via contract):** Free during Phase 1 (gas only).
+
 ## Gas Requirements
 
-Phase 1 mint is **FREE** (mintPrice = 0), but you still need a tiny amount of ETH on Base for gas.
+You need a tiny amount of ETH on Base for gas.
 
 | Action | Estimated Cost |
 |--------|---------------|
@@ -207,4 +213,5 @@ curl -X POST https://api.helixa.xyz/api/v2/agent/1/crossreg \
 - **RPC**: https://mainnet.base.org
 - **Block Explorer**: https://basescan.org
 - **Standard**: ERC-8004 (Trustless Agents)
-- **Phase**: 1 (FREE mint, gas only)
+- **Phase**: 1 (Agent mint: $1 USDC via x402 | Human mint: free, gas only)
+- **x402 Facilitator**: Dexter (`x402.dexter.cash`), supports Base mainnet
