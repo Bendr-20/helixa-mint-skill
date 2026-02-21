@@ -134,20 +134,63 @@ curl -X POST https://api.helixa.xyz/api/v2/mint \
   }'
 ```
 
-### Step 2: POST to Mint Endpoint
+### Step 2: x402 Payment Setup
 
-```
-POST https://api.helixa.xyz/api/v2/mint
-Authorization: Bearer {address}:{timestamp}:{signature}
-Content-Type: application/json
+The mint endpoint requires $1 USDC payment via x402. **Use the official SDK** — do NOT hand-roll EIP-3009 signatures.
 
-{
-  "name": "MyAgent",
-  "framework": "openclaw",
-  "personality": { ... },
-  "narrative": { ... }
-}
+```bash
+npm install @x402/fetch @x402/evm viem
 ```
+
+```javascript
+const { createWalletClient, http, publicActions } = require('viem');
+const { privateKeyToAccount } = require('viem/accounts');
+const { base } = require('viem/chains');
+const { wrapFetchWithPayment, x402Client } = require('@x402/fetch');
+const { ExactEvmScheme } = require('@x402/evm/exact/client');
+const { toClientEvmSigner } = require('@x402/evm');
+
+// Set up wallet + x402 payment client
+const account = privateKeyToAccount('0xYOUR_PRIVATE_KEY');
+const walletClient = createWalletClient({
+  account, chain: base, transport: http('https://mainnet.base.org'),
+}).extend(publicActions);
+
+const signer = toClientEvmSigner(walletClient);
+signer.address = walletClient.account.address; // Required for viem compat
+const scheme = new ExactEvmScheme(signer);
+const client = x402Client.fromConfig({
+  schemes: [{ client: scheme, network: 'eip155:8453' }],
+});
+
+// This fetch wrapper auto-handles 402 → payment → retry
+const x402Fetch = wrapFetchWithPayment(globalThis.fetch, client);
+```
+
+### Step 3: Mint
+
+Use `x402Fetch` instead of regular `fetch`. It automatically handles the 402 payment flow:
+
+```javascript
+const res = await x402Fetch('https://api.helixa.xyz/api/v2/mint', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': authHeader, // SIWA header from Step 1
+  },
+  body: JSON.stringify({
+    name: 'MyAgent',
+    framework: 'openclaw',
+    personality: { quirks: 'curious', values: 'transparency' },
+    narrative: { origin: 'Built to explore', mission: 'Score agents fairly' },
+  }),
+});
+
+const result = await res.json();
+// { success: true, tokenId: 901, txHash: "0x...", mintOrigin: "AGENT_SIWA" }
+```
+
+The SDK reads the `payment-required` header, signs a USDC transfer via EIP-3009, sends it through the Dexter facilitator (`x402.dexter.cash`), and retries the request with the payment proof. Your agent gets minted and auto-registered on the ERC-8004 registry.
 
 **Required fields:** `name`, `framework`
 **Optional fields:** `personality` (object), `narrative` (object)
