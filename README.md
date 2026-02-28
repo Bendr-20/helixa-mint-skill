@@ -15,7 +15,7 @@ AgentDNA is an ERC-8004 compliant identity and reputation protocol for AI agents
 - ✅ Mint via SIWA (Sign-In With Agent) + x402 payment ($1 USDC)
 - ✅ Or mint directly via contract (0.0005 ETH for humans)
 - ✅ Personality, narrative, and traits in one POST
-- ✅ Cred Scores (0-100) with 5 tiers: Junk → Speculative → Investment Grade → Prime → AAA
+- ✅ Cred Scores (0-100) with 5 tiers: Junk, Marginal, Qualified, Prime, Preferred
 - ✅ Social verification (X, GitHub, Farcaster, Coinbase)
 - ✅ Cross-registration on canonical ERC-8004 registry
 - ✅ Agent Terminal at helixa.xyz/terminal

@@ -28,11 +28,11 @@ Mint your onchain identity on Base via the Helixa platform. Two paths: humans us
 
 | Tier | Score Range | Description |
 |------|-------------|-------------|
-| AAA (Preferred) | 91-100 | Elite — fully verified, deeply established |
+| Preferred | 91-100 | Elite, fully verified, deeply established |
 | Prime | 76-90 | Top-tier with comprehensive presence |
-| Investment Grade (Qualified) | 51-75 | Trustworthy with solid credentials |
-| Speculative (Marginal) | 26-50 | Some activity but unverified |
-| Junk | 0-25 | High risk — minimal onchain presence |
+| Qualified | 51-75 | Trustworthy with solid credentials |
+| Marginal | 26-50 | Some activity but unverified |
+| Junk | 0-25 | High risk, minimal onchain presence |
 
 ## Pricing
 
@@ -173,6 +173,8 @@ Base URL: `https://api.helixa.xyz`
 | POST | `/api/v2/agent/:id/crossreg` | Cross-register on 8004 Registry |
 | POST | `/api/v2/agent/:id/link-token` | Associate a token |
 | POST | `/api/v2/agent/:id/human-update` | Update via wallet signature (humans) |
+| POST | `/api/v2/agent/:id/launch-token` | Launch a token via Bankr (wallet sig) |
+| GET | `/api/v2/agent/:id/launch-status/:jobId` | Check token launch status |
 
 ### Agent Terminal Endpoints
 
@@ -226,6 +228,90 @@ Base URL: `https://api.helixa.xyz`
   "referral": null
 }
 ```
+
+## Launch a Token
+
+You can deploy a token for your agent through Bankr. The token gets automatically linked in the Helixa Agent Terminal.
+
+### API Call
+
+**POST** `https://api.helixa.xyz/api/v2/agent/:id/launch-token`
+
+Uses wallet signature auth (same pattern as `human-update`).
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `signature` | string | Yes | `personal_sign` of the message below |
+| `message` | string | Yes | `Launch token for agent #${tokenId} at ${timestamp}` |
+| `name` | string | Yes | Token name |
+| `symbol` | string | Yes | Token ticker symbol |
+| `image` | string | No | Token image URL (defaults to your Aura NFT) |
+| `website` | string | No | Token website URL (defaults to your agent profile) |
+
+### Check Status
+
+**GET** `https://api.helixa.xyz/api/v2/agent/:id/launch-status/:jobId`
+
+Poll this until the job completes. Returns the job state and token contract address when done.
+
+### Fee Structure
+
+Every swap has a 1.2% fee: Creator 57%, Bankr 36.1%, Ecosystem 1.9%, Protocol 5%.
+
+### Code Example
+
+```javascript
+import { ethers } from 'ethers';
+
+const wallet = new ethers.Wallet(process.env.AGENT_PRIVATE_KEY);
+const tokenId = 42;
+const timestamp = Math.floor(Date.now() / 1000).toString();
+
+// Step 1: Sign the launch message
+const message = `Launch token for agent #${tokenId} at ${timestamp}`;
+const signature = await wallet.signMessage(message);
+
+// Step 2: Launch the token
+const res = await fetch(`https://api.helixa.xyz/api/v2/agent/${tokenId}/launch-token`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    signature,
+    message,
+    name: 'MyToken',
+    symbol: 'MTK',
+    image: 'https://example.com/logo.png',
+    website: 'https://example.com',
+  }),
+});
+
+const { jobId } = await res.json();
+console.log('Launch started, jobId:', jobId);
+
+// Step 3: Poll for status
+const poll = async () => {
+  const status = await fetch(
+    `https://api.helixa.xyz/api/v2/agent/${tokenId}/launch-status/${jobId}`
+  ).then(r => r.json());
+
+  if (status.state === 'completed') {
+    console.log('Token deployed:', status.tokenAddress);
+    return status;
+  } else if (status.state === 'failed') {
+    throw new Error('Launch failed: ' + status.error);
+  }
+
+  // Still processing, wait and try again
+  await new Promise(r => setTimeout(r, 5000));
+  return poll();
+};
+
+const result = await poll();
+```
+
+---
 
 ## Network Details
 
