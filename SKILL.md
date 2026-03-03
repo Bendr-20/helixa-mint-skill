@@ -95,21 +95,37 @@ const authHeader = `Bearer ${address}:${timestamp}:${signature}`;
 
 ### Step 2: x402 Payment Setup
 
+**Requirements:** Your agent wallet needs **$1 USDC** on Base and a tiny amount of ETH for gas (~0.0001 ETH).
+
 ```bash
 npm install @x402/fetch @x402/evm viem
 ```
 
 ```javascript
+const { createWalletClient, http } = require('viem');
+const { privateKeyToAccount } = require('viem/accounts');
+const { base } = require('viem/chains');
 const { wrapFetchWithPayment, x402Client } = require('@x402/fetch');
 const { ExactEvmScheme } = require('@x402/evm/exact/client');
 const { toClientEvmSigner } = require('@x402/evm');
 
+// Create viem wallet client (required by x402)
+const account = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY);
+const walletClient = createWalletClient({
+    account,
+    chain: base,
+    transport: http('https://mainnet.base.org'),
+});
+
+// Create x402 payment client
 const signer = toClientEvmSigner(walletClient);
 signer.address = walletClient.account.address;
 const scheme = new ExactEvmScheme(signer);
 const client = x402Client.fromConfig({ schemes: [{ client: scheme, network: 'eip155:8453' }] });
 const x402Fetch = wrapFetchWithPayment(globalThis.fetch, client);
 ```
+
+**How it works:** When you call `x402Fetch()` and the server returns HTTP 402, the client automatically reads the payment requirements, signs a USDC authorization (EIP-3009), and retries with a `Payment` header. The payment is verified and settled through the x402 facilitator. No manual USDC transfer needed.
 
 ### Step 3: Mint
 
@@ -144,6 +160,36 @@ const res = await x402Fetch('https://api.helixa.xyz/api/v2/mint', {
 const result = await res.json();
 // { success: true, tokenId: 901, txHash: "0x...", crossRegistration: { agentId: 18702 } }
 ```
+
+---
+
+## Alternative: Manual USDC Payment (without @x402/fetch)
+
+If you can't use the x402 SDK, you can pay manually:
+
+1. Send $1 USDC to `0x339559A2d1CD15059365FC7bD36b3047BbA480E0` on Base
+2. Include the TX hash in your mint request:
+
+```javascript
+const res = await fetch('https://api.helixa.xyz/api/v2/mint', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,  // SIWA auth (see Step 1)
+        'X-Payment-Proof': '0xYOUR_USDC_TX_HASH',
+    },
+    body: JSON.stringify({
+        name: 'MyAgent',
+        framework: 'openclaw',
+    }),
+});
+```
+
+**Accepted payment headers (in priority order):**
+1. `Payment` — official x402 protocol (base64-encoded signed authorization)
+2. `X-Payment-Proof` — USDC transfer TX hash on Base
+3. `X-Payment-Tx` — alias for X-Payment-Proof
+4. `body.paymentTx` — TX hash in request body
 
 ---
 
@@ -331,5 +377,5 @@ const result = await poll();
 - **8004 Registry**: `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
 - **RPC**: https://mainnet.base.org
 - **Explorer**: https://basescan.org
-- **x402 Facilitator**: `https://x402.dexter.cash`
+- **x402 Facilitator**: `https://x402.dexter.cash` (supports Base mainnet `eip155:8453`. Note: `x402.org` does NOT support Base mainnet)
 - **USDC (Base)**: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
