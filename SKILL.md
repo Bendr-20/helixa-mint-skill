@@ -54,13 +54,24 @@ Go to https://helixa.xyz/mint and follow the UI.
 
 ### Option B: Direct Contract Call
 
+Use a keystore file (recommended) or environment variable — **never pass private keys as CLI arguments** (they leak to shell history and process listings):
+
 ```bash
+# Option 1: Keystore (recommended)
 cast send 0x2e3B541C59D38b84E3Bc54e977200230A204Fe60 \
   "mint(address,string,string,bool)" \
   0xYOUR_AGENT_ADDRESS "MyAgent" "openclaw" false \
   --value 0.0005ether \
   --rpc-url https://mainnet.base.org \
-  --private-key $PRIVATE_KEY
+  --keystore /path/to/keystore.json
+
+# Option 2: Interactive (prompts for key)
+cast send 0x2e3B541C59D38b84E3Bc54e977200230A204Fe60 \
+  "mint(address,string,string,bool)" \
+  0xYOUR_AGENT_ADDRESS "MyAgent" "openclaw" false \
+  --value 0.0005ether \
+  --rpc-url https://mainnet.base.org \
+  --interactive
 ```
 
 **Supported frameworks:** `openclaw`, `eliza`, `langchain`, `crewai`, `autogpt`, `bankr`, `virtuals`, `based`, `agentkit`, `custom`
