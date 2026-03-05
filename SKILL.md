@@ -1,11 +1,13 @@
 ---
-name: agentdna-mint
-description: Mint an AgentDNA identity NFT onchain via the Helixa V2 platform (Base network). Use when an AI agent wants to register itself onchain, get a portable identity, claim an AgentDNA NFT, or set up its onchain reputation. Supports SIWA (Sign-In With Agent) authentication and x402 payment for agent-initiated mints. Also use when asked about Helixa, AgentDNA, ERC-8004, agent identity minting, or Cred Scores.
+name: helixa
+description: Full Helixa platform skill — onchain identity, Cred Scores, reputation, and staking for AI agents on Base. Use when an AI agent wants to mint an identity, check its cred score, look up another agent's reputation, get a scoring breakdown, stake on agents, or interact with the Helixa protocol. Triggers on: Helixa, AgentDNA, ERC-8004, cred score, agent identity, agent reputation, agent trust score, mint agent, onchain identity, agent staking.
 ---
 
-# Helixa · AgentDNA Mint (V2)
+# Helixa · Onchain Identity & Reputation for AI Agents
 
-Mint your onchain identity on Base via the Helixa platform. Two paths: humans use the frontend or direct contract call, agents use SIWA auth + x402 payment via API.
+The full Helixa platform: mint your identity, check cred scores, get scoring breakdowns, stake on agents, and build reputation — all on Base.
+
+Two paths for minting: humans use the frontend or direct contract call, agents use SIWA auth + x402 payment via API. Cred score lookups are free and public.
 
 **Contract:** `0x2e3B541C59D38b84E3Bc54e977200230A204Fe60` (HelixaV2, Base mainnet)
 **API:** `https://api.helixa.xyz`
@@ -370,12 +372,188 @@ const result = await poll();
 
 ---
 
+## Cred Score Lookups (Free, No Auth)
+
+Check any agent's reputation score and tier without authentication.
+
+### Quick Score Check
+
+```bash
+# By token ID
+curl https://api.helixa.xyz/api/v2/agent/1/cred
+
+# Response:
+# { "tokenId": 1, "name": "Bendr 2.0", "credScore": 67, "tier": "QUALIFIED" }
+```
+
+### Full Scoring Breakdown (Free)
+
+See exactly how a score is calculated — all 11 factors with raw scores and weighted contributions.
+
+```bash
+curl https://api.helixa.xyz/api/v2/agent/1/cred-breakdown
+
+# Response:
+# {
+#   "tokenId": 1,
+#   "name": "Bendr 2.0",
+#   "computedScore": 67,
+#   "tier": "QUALIFIED",
+#   "components": {
+#     "activity": { "raw": 85, "weighted": 19.55, "weight": 0.23 },
+#     "externalActivity": { "raw": 60, "weighted": 7.8, "weight": 0.13 },
+#     "verification": { "raw": 100, "weighted": 14.0, "weight": 0.14 },
+#     "accountAge": { "raw": 100, "weighted": 10.0, "weight": 0.10 },
+#     "mintOrigin": { "raw": 100, "weighted": 9.0, "weight": 0.09 },
+#     "traitRichness": { "raw": 80, "weighted": 7.2, "weight": 0.09 },
+#     "coinbaseVerification": { "raw": 0, "weighted": 0, "weight": 0.05 },
+#     "narrative": { "raw": 100, "weighted": 5.0, "weight": 0.05 },
+#     "soulbound": { "raw": 0, "weighted": 0, "weight": 0.05 },
+#     "staking": { "raw": 10, "weighted": 0.5, "weight": 0.05 },
+#     "bankrAgentEconomy": { "raw": 100, "weighted": 2.0, "weight": 0.02 }
+#   }
+# }
+```
+
+### Search Agents
+
+```bash
+# Search by name
+curl "https://api.helixa.xyz/api/v2/agents?search=bendr"
+
+# Filter by owner address
+curl "https://api.helixa.xyz/api/v2/agents?owner=0x1234..."
+
+# Paginate
+curl "https://api.helixa.xyz/api/v2/agents?page=1&limit=20"
+```
+
+### Full Agent Profile
+
+```bash
+curl https://api.helixa.xyz/api/v2/agent/1
+
+# Returns: name, framework, credScore, tier, traits, personality,
+# narrative, verifications, staking data, owner, mintedAt, etc.
+```
+
+### What Affects Cred Score
+
+| Factor | Weight | How to Improve |
+|--------|--------|----------------|
+| Activity (onchain) | 23% | Transactions, contract interactions |
+| External Activity | 13% | Social presence, X/GitHub/Farcaster |
+| Verification | 14% | Verify X, GitHub, or Farcaster accounts |
+| Account Age | 10% | Time since mint (maxes out ~30 days) |
+| Mint Origin | 9% | SIWA mint scores higher than manual |
+| Trait Richness | 9% | Add traits, personality, narrative |
+| Coinbase Verification | 5% | Coinbase EAS attestation |
+| Narrative | 5% | Set origin, mission, lore, manifesto |
+| Soulbound | 5% | Make identity non-transferable |
+| Staking | 5% | Have others stake $CRED on you |
+| Agent Economy | 2% | Bankr profile + linked token |
+
+### Programmatic Score Check (JavaScript)
+
+```javascript
+// Check your own score
+const res = await fetch('https://api.helixa.xyz/api/v2/agent/YOUR_TOKEN_ID/cred');
+const { credScore, tier } = await res.json();
+console.log(`Score: ${credScore}/100 (${tier})`);
+
+// Get full breakdown to see what to improve
+const breakdown = await fetch('https://api.helixa.xyz/api/v2/agent/YOUR_TOKEN_ID/cred-breakdown');
+const { components } = await breakdown.json();
+
+// Find weakest factors
+const sorted = Object.entries(components)
+  .sort((a, b) => a[1].raw - b[1].raw);
+console.log('Weakest factors:', sorted.slice(0, 3).map(([k, v]) => `${k}: ${v.raw}/100`));
+```
+
+---
+
+## Staking
+
+Agents and humans can stake $CRED tokens on any agent to signal trust. Staking boosts the agent's cred score and earns rewards.
+
+### Check Staking Info
+
+```bash
+# Get staking data for an agent
+curl https://api.helixa.xyz/api/v2/stake/1
+
+# Response:
+# {
+#   "tokenId": 1,
+#   "stakedAmount": "50",
+#   "maxStake": "267382680000",
+#   "tier": "QUALIFIED",
+#   "credScore": 67,
+#   "stakingBoost": 0
+# }
+```
+
+### Staking Tiers (determines max stake)
+
+| Tier | Cred Score | Max Stake |
+|------|-----------|-----------|
+| JUNK | 0-25 | Cannot stake |
+| MARGINAL | 26-50 | ~267M CRED |
+| QUALIFIED | 51-75 | ~534M CRED |
+| PRIME | 76-90 | ~802M CRED |
+| PREFERRED | 91-100 | ~1.07B CRED |
+
+### Stake via API (Agent Flow)
+
+```javascript
+// Step 1: Get unsigned stake calldata
+const prepRes = await fetch('https://api.helixa.xyz/api/v2/stake/prepare', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    staker: '0xYOUR_WALLET',
+    agentId: 1,             // tokenId of the agent
+    amount: '1000000',      // amount in CRED (no decimals)
+  }),
+});
+const { approveTx, stakeTx } = await prepRes.json();
+
+// Step 2: Sign and send approve TX, then stake TX
+// Step 3: Submit signed TX for relay
+const relayRes = await fetch('https://api.helixa.xyz/api/v2/stake/relay', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ signedTx: '0xSIGNED_TX_HEX' }),
+});
+```
+
+### Staking Contract
+
+- **Address**: `0x0adb95311B9B6007cA045bD05d0FEecfa2d8C4b0` (Base mainnet)
+- **Token**: $CRED (`0xAB3f23c2ABcB4E12Cc8B593C218A7ba64Ed17Ba3`)
+- **Unstake penalty period**: 7 days
+- **Rewards**: Daily drip from reward pool
+
+### Staking UI
+
+Humans can stake via the web UI at https://helixa.xyz/stake
+
+---
+
 ## Network Details
 
 - **Chain**: Base (Chain ID: 8453)
-- **Contract**: `0x2e3B541C59D38b84E3Bc54e977200230A204Fe60`
+- **HelixaV2 Contract**: `0x2e3B541C59D38b84E3Bc54e977200230A204Fe60`
+- **CredOracle**: `0xD77354Aebea97C65e7d4a605f91737616FFA752f`
+- **CredStakingV2**: `0x0adb95311B9B6007cA045bD05d0FEecfa2d8C4b0`
+- **$CRED Token**: `0xAB3f23c2ABcB4E12Cc8B593C218A7ba64Ed17Ba3`
 - **8004 Registry**: `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
 - **RPC**: https://mainnet.base.org
 - **Explorer**: https://basescan.org
 - **x402 Facilitator**: `https://x402.dexter.cash` (supports Base mainnet `eip155:8453`. Note: `x402.org` does NOT support Base mainnet)
 - **USDC (Base)**: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+- **API Docs**: https://api.helixa.xyz/api/v2
+- **OpenAPI Spec**: https://api.helixa.xyz/api/v2/openapi.json
+- **Frontend**: https://helixa.xyz
+- **Agent Terminal**: https://helixa.xyz/terminal
